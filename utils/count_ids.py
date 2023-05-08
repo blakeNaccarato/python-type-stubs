@@ -36,7 +36,7 @@ def count(root, suffix, regex, uniq):
     except Exception as e:
         print(f"Invalid regex {regex}: {e}")
         return
-    pathpat = root + '/**/' + filepat
+    pathpat = f'{root}/**/{filepat}'
     for name in glob.iglob(pathpat, recursive=True):
         n = 0
         if os.path.isdir(name): 
@@ -57,7 +57,7 @@ def count(root, suffix, regex, uniq):
                             ctx[id] = line[:-1]
         except Exception as e:
             print(f"Couldn't process file {name}: {e}")
-     
+
     if uniq:
         for id, lc in loc.items():
             print(f'{id}: {lc}: {ctx[id]}')

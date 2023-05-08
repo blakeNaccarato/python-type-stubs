@@ -33,7 +33,7 @@ overloads = {}
 
 
 def my_overload(func):
-    key = func.__module__ + '.' + func.__name__
+    key = f'{func.__module__}.{func.__name__}'
     if key not in overloads:
         fn = lambda *args, **kwds: _overload_dummy(args, kwds)
         overloads[key] = fn
@@ -61,23 +61,23 @@ def import_dual(m: str, stub_path: str) -> Tuple:
     """
     
     def _clean(m):
-        to_del = [k for k in sys.modules.keys() if k == m or k.startswith(m + '.')]
+        to_del = [k for k in sys.modules.keys() if k == m or k.startswith(f'{m}.')]
         for k in to_del:
             del sys.modules[k]
         importlib.invalidate_caches()
-    
+
     _clean(m)
-        
+
     m1 = importlib.import_module(m)
-    
+
     _clean(m)
-    
+
     sys.path_hooks.insert(0,
         importlib.machinery.FileFinder.path_hook(
             (importlib.machinery.SourceFileLoader, ['.pyi']))
     )
     sys.path.insert(0, stub_path)
-    
+
     try:
         m2 = importlib.import_module(m)
         return m1, m2
@@ -179,25 +179,23 @@ def gather(name: str, m: object) -> Item:
                     mfpath = inspect.getfile(v)
                     if mfpath.startswith(root):
                         mfpath = mfpath[len(root)+1:]
-                        members = dict()
-                        items[k] = Item.make_module(mfpath, mpath, k, v, members) 
-                        _gather(mpath + '.' + k, v, root, mfpath, completed, members)
+                        members = {}
+                        items[k] = Item.make_module(mfpath, mpath, k, v, members)
+                        _gather(f'{mpath}.{k}', v, root, mfpath, completed, members)
             elif inspect.isfunction(v):
                 if k in items:
                     print(f'{name} already has a function {k}')
                 items[k] = Item.make_function(fpath, mpath, k, v)
             elif inspect.isclass(v):
-                members = dict()
+                members = {}
                 items[k] = Item.make_class(fpath, mpath, k, v, members)
                 for kc, vc in inspect.getmembers(v):
                     if kc[0] != '_' and (inspect.isfunction(vc) or str(type(vc)) == "<class 'property'>"):
                         members[kc] = Item.make_function(fpath, mpath, kc, vc)
-            else:
-                pass
 
     fpath = m.__dict__['__file__']
     root = fpath[:fpath.rfind('/')]  # fix for windows
-    members = dict()
+    members = {}
     package = Item.make_module(fpath, '', name, m, members)
     _gather(name, m, root, fpath, set(), members)
     return package
@@ -220,7 +218,7 @@ def walk(tree: dict, fn: Callable, *args, postproc: Callable=None, path=None):
         if fn(path, k, v, *args):
             to_postproc.append(k)
         elif v.children:
-            walk(v.children, fn, *args, postproc=postproc, path=path + '/' + k)
+            walk(v.children, fn, *args, postproc=postproc, path=f'{path}/{k}')
     if postproc:
         postproc(tree, to_postproc)
         
@@ -309,10 +307,7 @@ def compare_args(real: Item, stub: Item, owner: Optional[str] = None):
             print(f"{module}.{owner}{name} passes argument checks")
 
     except Exception as e:
-        if str(e).find("'property' object") >= 0:
-            pass
-            #print(f"Failed to validate property {module}.{owner}{name}")
-        else:
+        if str(e).find("'property' object") < 0:
             print(f"Failed to validate {module}.{owner}{name}: {e}")
 
 
@@ -328,8 +323,7 @@ def compare_functions(real: List[Item], stub: List[Item], owner: Optional[str]=N
     i_s = 0
     while i_s < len(stub):
         s = stub[i_s]
-        a = s.analog
-        if a:
+        if a := s.analog:
             compare_args(a, s, owner)
         i_s += 1
 
@@ -341,8 +335,7 @@ def compare_classes(real: List[Item], stub: List[Item]):
     i_s = 0
     while i_s < len(stub):
         s = stub[i_s]
-        a = s.analog
-        if a:
+        if a := s.analog:
             real_functions, _ = collect_items(a)
             stub_functions, _ = collect_items(s)
             compare_functions(real_functions, stub_functions, s.name)
@@ -355,12 +348,9 @@ def find_item(items: List[Item], name: str,
     """
     which - whether this is 'stub' or 'real'
     """
-    i = 0
-    while i < len(items):
-        if items[i].name == name:
-            return items[i]
-            break
-        i += 1
+    for item in items:
+        if item.name == name:
+            return item
     print(f"No {which} {type_} found with name {name}")
 
 
